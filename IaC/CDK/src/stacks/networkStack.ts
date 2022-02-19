@@ -2,11 +2,10 @@ import { App, aws_ec2, CfnElement, CfnOutput, Stack, StackProps } from 'aws-cdk-
 import { IVpc, Vpc } from 'aws-cdk-lib/aws-ec2';
 
 export class NetworkStack extends Stack {
-  readonly vpc: IVpc;
+  public readonly vpc: IVpc;
   constructor(scope: App, id: string, props?: StackProps) {
     super(scope, id, props);
     this.vpc = this.createVPC();
-    this.createNetworkOutputs();
   }
 
   protected allocateLogicalId(cfnElement: CfnElement): string {
@@ -29,42 +28,17 @@ export class NetworkStack extends Stack {
       },
       {
         cidrMask: 24,
-        name: 'Private',
-        subnetType: aws_ec2.SubnetType.PRIVATE_WITH_NAT
-      },
-      {
-        cidrMask: 24,
-        name: 'IsolatedA',
+        name: 'EC2Isolated',
         subnetType: aws_ec2.SubnetType.PRIVATE_ISOLATED
       },
       {
         cidrMask: 24,
-        name: 'IsolatedB',
+        name: 'DatabaseIsolated',
         subnetType: aws_ec2.SubnetType.PRIVATE_ISOLATED
       }],
       
     });
 
     return vpc;
-  }
-
-  private createNetworkOutputs() {
-    new CfnOutput(this, 'VPCidOutput', {
-      description: 'VPC id',
-      value: this.vpc.vpcId,
-      exportName: 'VPC'
-    });
-
-    new CfnOutput(this, 'PublicSubnet1Output', {
-      description: 'Public Subnet1 Id',
-      value: this.vpc.publicSubnets[0].subnetId,
-      exportName: 'PublicSubnet1'
-    })
-
-    new CfnOutput(this, 'PublicSubnet2Output', {
-      description: 'Public Subnet2 Id',
-      value: this.vpc.publicSubnets[1].subnetId,
-      exportName: 'PublicSubnet2'
-    })
   }
 }

@@ -6,8 +6,10 @@ import { ResourcesStack } from './stacks/resourcesStack';
 
 const app = new cdk.App();
 
-const network = new NetworkStack(app, 'networkStack');
-const resourcesStack = new ResourcesStack(app, 'resourcesStack');
+const networkStack = new NetworkStack(app, 'networkStack');
+const resourcesStack = new ResourcesStack(app, 'resourcesStack', {
+    vpc: networkStack.vpc
+});
 
 
-// resourcesStack.addDependency(network);
+resourcesStack.addDependency(networkStack);
