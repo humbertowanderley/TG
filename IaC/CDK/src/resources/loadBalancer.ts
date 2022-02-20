@@ -1,15 +1,23 @@
 import { CfnOutput, Duration } from "aws-cdk-lib";
-import { IVpc } from "aws-cdk-lib/aws-ec2";
+import { IVpc, Peer, Port, SecurityGroup } from "aws-cdk-lib/aws-ec2";
 import { Ec2Service } from "aws-cdk-lib/aws-ecs";
 import { ApplicationLoadBalancer, ListenerAction, ListenerCondition } from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import { ResourcesStack } from "../stacks/resourcesStack";
 
 export class LoadBalancer {
 
-    public static createLoadBalancer(resourcesStack: ResourcesStack, vpc: IVpc, ecsService: Ec2Service): void {
+    public static createLoadBalancer(resourcesStack: ResourcesStack, vpc: IVpc, ecsService: Ec2Service): void {        
+        const albSecurityGroup = new SecurityGroup(resourcesStack, 'albSecurityGroup', {
+            vpc: vpc
+        });
+
+        albSecurityGroup.addEgressRule(Peer.anyIpv4(), Port.allTraffic());
+        albSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(80));
+
         const alb = new ApplicationLoadBalancer(resourcesStack, "ApplicationLoadBalancer", {
             vpc: vpc,
-            internetFacing: true
+            internetFacing: true,
+            securityGroup: albSecurityGroup
         });
 
         const listener = alb.addListener('Listener', {

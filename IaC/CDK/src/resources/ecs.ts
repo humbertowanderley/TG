@@ -1,5 +1,5 @@
 import { aws_autoscaling, aws_ec2, aws_ecs } from "aws-cdk-lib";
-import { IVpc} from "aws-cdk-lib/aws-ec2";
+import { IVpc, Peer, Port, SecurityGroup} from "aws-cdk-lib/aws-ec2";
 import { Ec2Service, Ec2TaskDefinition } from "aws-cdk-lib/aws-ecs";
 import { ResourcesStack } from "../stacks/resourcesStack";
 
@@ -15,6 +15,12 @@ export class ECS {
     }
 
     private static createCapacityProvider(resourcesStack: ResourcesStack, vpc: IVpc): aws_ecs.AsgCapacityProvider {
+        const autoScalingSecurityGroup = new SecurityGroup(resourcesStack, 'asgSecurityGroup', {
+            vpc: vpc
+        });
+        autoScalingSecurityGroup.addEgressRule(Peer.securityGroupId('albSecurityGroup'), Port.allTraffic());
+        autoScalingSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.allTcp());
+
         const autoScalingGroup = new aws_autoscaling.AutoScalingGroup(resourcesStack, 'ASG', {
             autoScalingGroupName: 'asg',
             vpc,
@@ -37,9 +43,10 @@ export class ECS {
     private static createECSEc2TaskDefinition(resourcesStack: ResourcesStack): Ec2TaskDefinition {
         const ec2TaskDefinition = new aws_ecs.Ec2TaskDefinition(resourcesStack, 'TaskDefinition');
         ec2TaskDefinition.addContainer('DefaultContainer', {
+            containerName: 'webApp',
             image: aws_ecs.ContainerImage.fromRegistry("amazon/amazon-ecs-sample"),
-            memoryLimitMiB: 256,
-            portMappings: [{ hostPort: 80, containerPort: 80 }]
+            memoryLimitMiB: 128,
+            portMappings: [{ containerPort: 80 }]
         })
         return ec2TaskDefinition
     }
@@ -53,7 +60,8 @@ export class ECS {
 
         const service = new aws_ecs.Ec2Service(resourcesStack, 'ECSService', {
             cluster: ecsCluster,
-            taskDefinition: ec2TaskDefinition
+            taskDefinition: ec2TaskDefinition,
+            desiredCount: 2
         });
         return service;
     }
