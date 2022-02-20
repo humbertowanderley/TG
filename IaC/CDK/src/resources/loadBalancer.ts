@@ -1,6 +1,6 @@
 import { CfnOutput, Duration } from "aws-cdk-lib";
 import { IVpc } from "aws-cdk-lib/aws-ec2";
-import { Ec2Service, Ec2TaskDefinition, ICluster, IEc2TaskDefinition } from "aws-cdk-lib/aws-ecs";
+import { Ec2Service } from "aws-cdk-lib/aws-ecs";
 import { ApplicationLoadBalancer, ListenerAction, ListenerCondition } from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import { ResourcesStack } from "../stacks/resourcesStack";
 
@@ -25,7 +25,9 @@ export class LoadBalancer {
                 unhealthyThresholdCount: 2,
                 healthyThresholdCount: 5,
                 interval: Duration.seconds(30),
-            }
+            },
+            stickinessCookieDuration: Duration.days(1)
+
         });
 
         listener.addAction('/static', {
