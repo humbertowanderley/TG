@@ -1,23 +1,17 @@
-import { CfnOutput, Duration } from "aws-cdk-lib";
-import { IVpc, Peer, Port, SecurityGroup } from "aws-cdk-lib/aws-ec2";
+import { CfnOutput, Duration, Fn } from "aws-cdk-lib";
+import { SecurityGroup } from "aws-cdk-lib/aws-ec2";
 import { Ec2Service } from "aws-cdk-lib/aws-ecs";
 import { ApplicationLoadBalancer, ListenerAction, ListenerCondition } from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import { ResourcesStack } from "../stacks/resourcesStack";
 
 export class LoadBalancer {
 
-    public static createLoadBalancer(resourcesStack: ResourcesStack, vpc: IVpc, ecsService: Ec2Service): void {        
-        const albSecurityGroup = new SecurityGroup(resourcesStack, 'albSecurityGroup', {
-            vpc: vpc
-        });
-
-        albSecurityGroup.addEgressRule(Peer.anyIpv4(), Port.allTraffic());
-        albSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(80));
+    public static createLoadBalancer(resourcesStack: ResourcesStack, ecsService: Ec2Service): void {
 
         const alb = new ApplicationLoadBalancer(resourcesStack, "ApplicationLoadBalancer", {
-            vpc: vpc,
+            vpc: resourcesStack.vpc,
             internetFacing: true,
-            securityGroup: albSecurityGroup
+            securityGroup: SecurityGroup.fromSecurityGroupId(resourcesStack, 'albSGId', Fn.importValue('albSecurityGroupId'))
         });
 
         const listener = alb.addListener('Listener', {
@@ -48,6 +42,7 @@ export class LoadBalancer {
         });
 
         new CfnOutput(resourcesStack, 'albDNS', {
+            exportName: 'albDNS',
             value: alb.loadBalancerDnsName,
         });
     }

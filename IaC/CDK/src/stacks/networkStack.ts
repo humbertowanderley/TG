@@ -1,11 +1,13 @@
 import { App, aws_ec2, CfnElement, CfnOutput, Stack, StackProps } from 'aws-cdk-lib';
 import { IVpc, Vpc } from 'aws-cdk-lib/aws-ec2';
+import { SecurityGroups } from '../resources/securityGroups';
 
 export class NetworkStack extends Stack {
   public readonly vpc: IVpc;
   constructor(scope: App, id: string, props?: StackProps) {
     super(scope, id, props);
     this.vpc = this.createVPC();
+    this.createECSSecurityGroups();
   }
 
   protected allocateLogicalId(cfnElement: CfnElement): string {
@@ -40,5 +42,20 @@ export class NetworkStack extends Stack {
     });
 
     return vpc;
+  }
+
+  private createECSSecurityGroups() {
+    const albSecurityGroup = SecurityGroups.createALBSecurityGroup(this);
+    const ec2InstancesSecurityGroup = SecurityGroups.createEc2InstancesSecurityGroup(this, albSecurityGroup.securityGroupId);
+
+    new CfnOutput(this, 'albSecurityGroupId', {
+      exportName: 'albSecurityGroupId',
+      value: albSecurityGroup.securityGroupId
+    });
+
+    new CfnOutput(this, 'ec2InstancesSecurityGroup', {
+      exportName: 'ec2InstancesSecurityGroup',
+      value: ec2InstancesSecurityGroup.securityGroupId
+    });
   }
 }
