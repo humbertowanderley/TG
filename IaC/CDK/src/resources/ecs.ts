@@ -2,6 +2,7 @@ import { aws_autoscaling, aws_ec2, aws_ecs, Fn } from "aws-cdk-lib";
 import { IAutoScalingGroup } from "aws-cdk-lib/aws-autoscaling";
 import { SecurityGroup} from "aws-cdk-lib/aws-ec2";
 import { AsgCapacityProvider, Ec2Service, Ec2TaskDefinition, ICluster, IEc2TaskDefinition, ITaskDefinition } from "aws-cdk-lib/aws-ecs";
+import { ManagedPolicy, Role } from "aws-cdk-lib/aws-iam";
 import { ResourcesStack } from "../stacks/resourcesStack";
 
 
@@ -29,7 +30,8 @@ export class ECS {
 
     public static createCapacityProvider(resourcesStack: ResourcesStack, autoScalingGroup: IAutoScalingGroup): AsgCapacityProvider {
         const capacityProvider = new aws_ecs.AsgCapacityProvider(resourcesStack, 'AsgCapacityProvider', {
-            autoScalingGroup: autoScalingGroup
+            autoScalingGroup: autoScalingGroup,
+            enableManagedTerminationProtection: false
         });
         return capacityProvider;
     }
@@ -43,11 +45,13 @@ export class ECS {
             vpcSubnets: resourcesStack.vpc.selectSubnets({
                 subnetType: aws_ec2.SubnetType.PUBLIC
             }),
+            newInstancesProtectedFromScaleIn: false,
             minCapacity: 1,
             maxCapacity: 4,
             securityGroup: SecurityGroup.fromSecurityGroupId(resourcesStack, 'Ec2SGId', Fn.importValue('ec2InstancesSecurityGroup')),
         });
 
+        autoScalingGroup.role.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'));
         return autoScalingGroup;
     }
 
@@ -55,7 +59,7 @@ export class ECS {
         const ecsService = new aws_ecs.Ec2Service(resourcesStack, 'ECSService', {
             cluster: ecsCluster,
             taskDefinition: taskDefinition,
-            desiredCount: 2,
+            desiredCount: 1,
         });
         this.configureECSAutoScaling(ecsService);
         return ecsService;
@@ -64,7 +68,7 @@ export class ECS {
     private static configureECSAutoScaling(ecsSertice: Ec2Service) {
         const taskCount = ecsSertice.autoScaleTaskCount({
             minCapacity: 1,
-            maxCapacity: 4,
+            maxCapacity: 10,
         });
 
         taskCount.scaleOnCpuUtilization('scaleCPUUtilization', {
