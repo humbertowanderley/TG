@@ -1,82 +1,81 @@
-import { aws_autoscaling, aws_ec2, aws_ecs, Fn } from "aws-cdk-lib";
-import { IAutoScalingGroup } from "aws-cdk-lib/aws-autoscaling";
-import { SecurityGroup} from "aws-cdk-lib/aws-ec2";
-import { AsgCapacityProvider, Ec2Service, Ec2TaskDefinition, ICluster, IEc2TaskDefinition, ITaskDefinition } from "aws-cdk-lib/aws-ecs";
-import { ManagedPolicy, Role } from "aws-cdk-lib/aws-iam";
-import { ResourcesStack } from "../stacks/resourcesStack";
-
+import { IAutoScalingGroup } from "@aws-cdk/aws-autoscaling";
+import { AsgCapacityProvider, Ec2Service, Ec2TaskDefinition, ICluster, ContainerImage, Cluster } from "@aws-cdk/aws-ecs";
+import { ResourcesStack } from "../stacks/resources-stack";
+import { StackEnviroments } from "../utils/stackEnvironments";
+import * as ecr from '@aws-cdk/aws-ecr';
+import { Role } from "@aws-cdk/aws-iam";
+import { IRepository } from "@aws-cdk/aws-ecr";
+import { EcsEnvironments } from "../utils/ecsEnvironments";
+import { IAM } from "./iam";
 
 export class ECS {
 
-    public static createECSCluster(resourcesStack: ResourcesStack, capacityProvider: AsgCapacityProvider): aws_ecs.Cluster {
-        const ecsCluster = new aws_ecs.Cluster(resourcesStack, 'ECSCluster', {
-            clusterName: 'ecs-cluster',
+    public static createECSCluster(resourcesStack: ResourcesStack, capacityProvider: AsgCapacityProvider): Cluster {
+        const ecsCluster = new Cluster(resourcesStack, `${StackEnviroments.RESOURCES_PREFIX}ecsCluster`, {
+            clusterName: `${StackEnviroments.RESOURCES_PREFIX}ecsCluster`,
             vpc: resourcesStack.vpc
         });
         ecsCluster.addAsgCapacityProvider(capacityProvider);
         return ecsCluster;
     }
 
-    public static createECSEc2TaskDefinition(resourcesStack: ResourcesStack): Ec2TaskDefinition {
-        const ec2TaskDefinition = new aws_ecs.Ec2TaskDefinition(resourcesStack, 'TaskDefinition');
-        ec2TaskDefinition.addContainer('DefaultContainer', {
-            containerName: 'webApp',
-            image: aws_ecs.ContainerImage.fromRegistry("amazon/amazon-ecs-sample"),
-            memoryLimitMiB: 256,
-            portMappings: [{ containerPort: 80 }]
-        })
-        return ec2TaskDefinition
+    public static createEcsTaskDefinition(resourcesStack: ResourcesStack, containerName: string, port: number): Ec2TaskDefinition {
+
+        // TODO: Import Ec2 Role from environment stack
+        const ecsTaskDefinition = new Ec2TaskDefinition(resourcesStack, `${containerName}TaskDefinition`, {
+            taskRole: IAM.createInstanceRole('taskRole', resourcesStack)
+        });
+        ecsTaskDefinition.addContainer(containerName, {
+            containerName: containerName,
+            image: ContainerImage.fromRegistry('bitnami/moodle:3.11.6-debian-10-r27'),
+            memoryLimitMiB: EcsEnvironments.ECS_TASK_CONTAINERS_MEMORY_LIMIT,
+            portMappings: [{ containerPort: EcsEnvironments.ECS_MOODLE_PORT }],
+            environment: {
+                ['MOODLE_HOST']:'tgcin.com',
+                ['MOODLE_REVERSEPROXY']:'true',
+                ['MOODLE_SSLPROXY']:'true',
+                ['MOODLE_DATABASE_PASSWORD']:'T3st3nd412',
+                ['MOODLE_DATABASE_USER']:'dbuser',
+                ['MOODLE_DATABASE_NAME']:'moodledb'
+            }
+        });
+        return ecsTaskDefinition
     }
 
     public static createCapacityProvider(resourcesStack: ResourcesStack, autoScalingGroup: IAutoScalingGroup): AsgCapacityProvider {
-        const capacityProvider = new aws_ecs.AsgCapacityProvider(resourcesStack, 'AsgCapacityProvider', {
+        const capacityProvider = new AsgCapacityProvider(resourcesStack, 'AsgCapacityProvider', {
+            capacityProviderName:  `${StackEnviroments.RESOURCES_PREFIX}ecsCapacityProvider`,
             autoScalingGroup: autoScalingGroup,
-            enableManagedTerminationProtection: false
+            enableManagedTerminationProtection: false,
+            enableManagedScaling: true,
+            targetCapacityPercent: EcsEnvironments.ECS_TARGET_CAPACITY_PERCENT,
+            canContainersAccessInstanceRole: true
         });
         return capacityProvider;
     }
 
-    public static createAutoScalingGroup(resourcesStack: ResourcesStack) {
-        const autoScalingGroup = new aws_autoscaling.AutoScalingGroup(resourcesStack, 'ASG', {
-            autoScalingGroupName: 'asg',
-            vpc: resourcesStack.vpc,
-            instanceType: new aws_ec2.InstanceType('t2.micro'),
-            machineImage: aws_ecs.EcsOptimizedImage.amazonLinux2(),
-            vpcSubnets: resourcesStack.vpc.selectSubnets({
-                subnetType: aws_ec2.SubnetType.PUBLIC
-            }),
-            newInstancesProtectedFromScaleIn: false,
-            minCapacity: 1,
-            maxCapacity: 4,
-            securityGroup: SecurityGroup.fromSecurityGroupId(resourcesStack, 'Ec2SGId', Fn.importValue('ec2InstancesSecurityGroup')),
-        });
-
-        autoScalingGroup.role.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'));
-        return autoScalingGroup;
-    }
-
-    public static createECSService(resourcesStack: ResourcesStack, ecsCluster: ICluster, taskDefinition: Ec2TaskDefinition): Ec2Service {
-        const ecsService = new aws_ecs.Ec2Service(resourcesStack, 'ECSService', {
+    public static createECSServices(resourcesStack: ResourcesStack, ecsCluster: ICluster): Ec2Service[] {
+        const moodleService = new Ec2Service(resourcesStack, `${StackEnviroments.RESOURCES_PREFIX}moodleService`, {
             cluster: ecsCluster,
-            taskDefinition: taskDefinition,
-            desiredCount: 1,
+            taskDefinition: this.createEcsTaskDefinition(resourcesStack, 'moodle', EcsEnvironments.ECS_MOODLE_PORT),
+            desiredCount: 1
         });
-        this.configureECSAutoScaling(ecsService);
-        return ecsService;
+        this.configureECSAutoScaling('moodle', moodleService);
+        return [moodleService];
     }
 
-    private static configureECSAutoScaling(ecsSertice: Ec2Service) {
-        const taskCount = ecsSertice.autoScaleTaskCount({
-            minCapacity: 1,
-            maxCapacity: 10,
+    private static configureECSAutoScaling(id: string, ecsService: Ec2Service) {
+        const taskCount = ecsService.autoScaleTaskCount({
+            minCapacity: EcsEnvironments.ECS_MIN_CAPACITY,
+            maxCapacity: EcsEnvironments.ECS_MAX_CAPACITY,
         });
 
-        taskCount.scaleOnCpuUtilization('scaleCPUUtilization', {
-            targetUtilizationPercent: 80
+        taskCount.scaleOnCpuUtilization(`${id}ScaleCPUUtilization`, {
+            targetUtilizationPercent: EcsEnvironments.ECS_CPU_UTILIZATION_PERCENT
         });
 
-        taskCount.scaleOnMemoryUtilization('scaleMemmoryUtilization', {
-            targetUtilizationPercent: 80
+        taskCount.scaleOnMemoryUtilization(`${id}ScaleMemoryUtilization`, {
+            targetUtilizationPercent: EcsEnvironments.ECS_MEMORY_UTILIZATION_PERCENT
         });
     }
 }

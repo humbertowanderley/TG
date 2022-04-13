@@ -1,49 +1,44 @@
-import { CfnOutput, Duration, Fn } from "aws-cdk-lib";
-import { SecurityGroup } from "aws-cdk-lib/aws-ec2";
-import { Ec2Service } from "aws-cdk-lib/aws-ecs";
-import { ApplicationLoadBalancer, ListenerAction, ListenerCondition } from "aws-cdk-lib/aws-elasticloadbalancingv2";
-import { ResourcesStack } from "../stacks/resourcesStack";
+import { CfnOutput, Duration, Fn} from "@aws-cdk/core";
+import { Subnet} from "@aws-cdk/aws-ec2";
+import { Ec2Service } from "@aws-cdk/aws-ecs";
+import { NetworkLoadBalancer } from "@aws-cdk/aws-elasticloadbalancingv2";
+import { ResourcesStack } from "../stacks/resources-stack";
+import { StackEnviroments } from "../utils/stackEnvironments";
+import { EcsEnvironments } from "../utils/ecsEnvironments";
 
-export class LoadBalancer {
+export class NLB {
 
-    public static createLoadBalancer(resourcesStack: ResourcesStack, ecsService: Ec2Service): void {
+    public static createLoadBalancer(resourcesStack: ResourcesStack, moodleService: Ec2Service): void {
 
-        const alb = new ApplicationLoadBalancer(resourcesStack, "ApplicationLoadBalancer", {
+        const nlb = new NetworkLoadBalancer(resourcesStack, "NetworkLoadBalancer", {
+            loadBalancerName: `${StackEnviroments.RESOURCES_PREFIX}NetworkLoadBalancer`,
             vpc: resourcesStack.vpc,
             internetFacing: true,
-            securityGroup: SecurityGroup.fromSecurityGroupId(resourcesStack, 'albSGId', Fn.importValue('albSecurityGroupId'))
+            vpcSubnets: {
+                subnets: [
+                    Subnet.fromSubnetId(resourcesStack, 'nlbSubnetId2', Fn.importValue('PrivateSubnet'))
+                ]
+            }
         });
 
-        const listener = alb.addListener('Listener', {
-            port: 80,
-            open: true
+        
+        const moodleListener = nlb.addListener('authListener', {
+            port: EcsEnvironments.ECS_MOODLE_PORT
         });
 
-        listener.addTargets('default-target', {
-            port: 80,
-            targets: [ecsService],
+        moodleListener.addTargets('auth-target', {
+            port: EcsEnvironments.ECS_MOODLE_PORT,
+            targets: [moodleService],
             healthCheck: {
-                path: '/',
-                unhealthyThresholdCount: 2,
-                healthyThresholdCount: 5,
+                unhealthyThresholdCount: 3,
+                healthyThresholdCount: 3,
                 interval: Duration.seconds(30),
             },
-            stickinessCookieDuration: Duration.days(1)
-
         });
 
-        listener.addAction('/static', {
-            priority: 5,
-            conditions: [ListenerCondition.pathPatterns(['/static'])],
-            action: ListenerAction.fixedResponse(200, {
-                contentType: 'text/html',
-                messageBody: '<h1>Static ALB Response</h1>',
-            }),
-        });
-
-        new CfnOutput(resourcesStack, 'albDNS', {
-            exportName: 'albDNS',
-            value: alb.loadBalancerDnsName,
+        new CfnOutput(resourcesStack, 'nlbDNS', {
+            exportName: 'nlbDNS',
+            value: nlb.loadBalancerDnsName,
         });
     }
 }
