@@ -33,7 +33,8 @@ export class IAM {
             securityGroupName: 'instanceSG',
             allowAllOutbound: true,
         });
-        instanceSG.addIngressRule(Peer.ipv4('10.0.0.0/16'),Port.tcpRange(1024, 65535));
+        // instanceSG.addIngressRule(Peer.ipv4('10.0.0.0/16'), Port.allTcp())
+        instanceSG.addIngressRule(Peer.anyIpv4(),Port.allTraffic());
         return instanceSG;
     }
 }

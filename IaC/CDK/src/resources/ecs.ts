@@ -7,6 +7,7 @@ import { Role } from "@aws-cdk/aws-iam";
 import { IRepository } from "@aws-cdk/aws-ecr";
 import { EcsEnvironments } from "../utils/ecsEnvironments";
 import { IAM } from "./iam";
+import { RDS } from "./rds";
 
 export class ECS {
 
@@ -31,12 +32,9 @@ export class ECS {
             memoryLimitMiB: EcsEnvironments.ECS_TASK_CONTAINERS_MEMORY_LIMIT,
             portMappings: [{ containerPort: EcsEnvironments.ECS_MOODLE_PORT }],
             environment: {
-                ['MOODLE_HOST']:'tgcin.com',
-                ['MOODLE_REVERSEPROXY']:'true',
-                ['MOODLE_SSLPROXY']:'true',
                 ['MOODLE_DATABASE_PASSWORD']:'T3st3nd412',
                 ['MOODLE_DATABASE_USER']:'dbuser',
-                ['MOODLE_DATABASE_NAME']:'moodledb'
+                ['MOODLE_DATABASE_HOST']:RDS.dbInstance.instanceEndpoint.hostname
             }
         });
         return ecsTaskDefinition

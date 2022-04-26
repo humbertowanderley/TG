@@ -16,7 +16,7 @@ export class NLB {
             internetFacing: true,
             vpcSubnets: {
                 subnets: [
-                    Subnet.fromSubnetId(resourcesStack, 'nlbSubnetId2', Fn.importValue('PrivateSubnet'))
+                    Subnet.fromSubnetId(resourcesStack, 'nlbSubnetId2', Fn.importValue('PublicSubnet'))
                 ]
             }
         });

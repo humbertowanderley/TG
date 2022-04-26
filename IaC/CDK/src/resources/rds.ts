@@ -7,11 +7,13 @@ import { ResourcesStack } from "../stacks/resources-stack";
 import { NetworkStack } from "../stacks/network-stack";
 import { StackEnviroments } from "../utils/stackEnvironments";
 import { AutoScalingGroupEnviroments } from "../utils/autoScalingGroupEnvironments";
-import { Credentials, DatabaseInstance, DatabaseInstanceEngine, MariaDbEngineVersion } from "@aws-cdk/aws-rds";
+import { Credentials, DatabaseInstance, DatabaseInstanceEngine, IDatabaseInstance, MariaDbEngineVersion } from "@aws-cdk/aws-rds";
 
 export class RDS {
+    public static dbInstance : IDatabaseInstance;
+
     public static createRDS(resourcesStack: ResourcesStack) {
-        const dbInstance = new DatabaseInstance(resourcesStack, 'db-instance', {
+        this.dbInstance = new DatabaseInstance(resourcesStack, 'db-instance', {
             vpc: resourcesStack.vpc,
             vpcSubnets: {
                 subnets: [
@@ -32,14 +34,14 @@ export class RDS {
             deleteAutomatedBackups: true,
             removalPolicy: RemovalPolicy.DESTROY,
             deletionProtection: false,
-            databaseName: 'appdb',
+            databaseName: 'bitnami_moodle',
             publiclyAccessible: false,
         });
 
-        dbInstance.connections.allowDefaultPortFrom(Peer.ipv4('10.0.0.0/16'));
+        this.dbInstance.connections.allowDefaultPortFrom(Peer.ipv4('10.0.0.0/16'));
 
         new CfnOutput(resourcesStack, 'dbEndpoint', {
-            value: dbInstance.instanceEndpoint.hostname,
+            value: this.dbInstance.instanceEndpoint.hostname,
         });
     }
 }
