@@ -23,7 +23,7 @@ export class NLB {
 
         
         const moodleListener = nlb.addListener('authListener', {
-            port: EcsEnvironments.ECS_MOODLE_PORT
+            port: 80
         });
 
         moodleListener.addTargets('auth-target', {
