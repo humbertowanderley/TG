@@ -8,9 +8,9 @@ class EcsEnvironments {
         );
     }
 
-    public static get ECS_MOODLE_PORT(): number {
+    public static get ECS_GF_PORT(): number {
         return EcsEnvironments.getNumberValue(
-            "ECS_MOODLE_PORT"
+            "ECS_GF_PORT"
         );
     }
 

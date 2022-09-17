@@ -1,7 +1,7 @@
-import { CfnOutput, Duration, Fn} from "@aws-cdk/core";
-import { Subnet} from "@aws-cdk/aws-ec2";
-import { Ec2Service } from "@aws-cdk/aws-ecs";
-import { NetworkLoadBalancer } from "@aws-cdk/aws-elasticloadbalancingv2";
+import { CfnOutput, Duration, Fn} from "aws-cdk-lib";
+import { Subnet} from "aws-cdk-lib/aws-ec2";
+import { Ec2Service } from "aws-cdk-lib/aws-ecs";
+import { NetworkLoadBalancer } from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import { ResourcesStack } from "../stacks/resources-stack";
 import { StackEnviroments } from "../utils/stackEnvironments";
 import { EcsEnvironments } from "../utils/ecsEnvironments";
@@ -27,7 +27,7 @@ export class NLB {
         });
 
         moodleListener.addTargets('auth-target', {
-            port: EcsEnvironments.ECS_MOODLE_PORT,
+            port: EcsEnvironments.ECS_GF_PORT,
             targets: [moodleService],
             healthCheck: {
                 unhealthyThresholdCount: 3,

@@ -1,13 +1,14 @@
-import { IAutoScalingGroup } from "@aws-cdk/aws-autoscaling";
-import { AsgCapacityProvider, Ec2Service, Ec2TaskDefinition, ICluster, ContainerImage, Cluster } from "@aws-cdk/aws-ecs";
+import { IAutoScalingGroup } from "aws-cdk-lib/aws-autoscaling";
+import { AsgCapacityProvider, Ec2Service, Ec2TaskDefinition, ICluster, ContainerImage, Cluster } from "aws-cdk-lib/aws-ecs";
 import { ResourcesStack } from "../stacks/resources-stack";
 import { StackEnviroments } from "../utils/stackEnvironments";
-import * as ecr from '@aws-cdk/aws-ecr';
-import { Role } from "@aws-cdk/aws-iam";
-import { IRepository } from "@aws-cdk/aws-ecr";
+import * as ecr from 'aws-cdk-lib/aws-ecr';
+import { Role } from "aws-cdk-lib/aws-iam";
+import { IRepository } from "aws-cdk-lib/aws-ecr";
 import { EcsEnvironments } from "../utils/ecsEnvironments";
 import { IAM } from "./iam";
 import { RDS } from "./rds";
+import { Volume } from "aws-cdk-lib/aws-ec2";
 
 export class ECS {
 
@@ -24,25 +25,29 @@ export class ECS {
 
         // TODO: Import Ec2 Role from environment stack
         const ecsTaskDefinition = new Ec2TaskDefinition(resourcesStack, `${containerName}TaskDefinition`, {
-            taskRole: IAM.createInstanceRole('taskRole', resourcesStack)
+            taskRole: IAM.instanceRole
         });
         ecsTaskDefinition.addContainer(containerName, {
             containerName: containerName,
-            image: ContainerImage.fromRegistry('bitnami/moodle:3.11.6-debian-10-r27'),
+            image: ContainerImage.fromRegistry('grafana/grafana:9.1.5-ubuntu'),
             memoryLimitMiB: EcsEnvironments.ECS_TASK_CONTAINERS_MEMORY_LIMIT,
-            portMappings: [{ containerPort: EcsEnvironments.ECS_MOODLE_PORT }],
+            portMappings: [{ containerPort: EcsEnvironments.ECS_GF_PORT }],
             environment: {
-                ['MOODLE_DATABASE_PASSWORD']:'T3st3nd412',
-                ['MOODLE_DATABASE_USER']:'dbuser',
-                ['MOODLE_DATABASE_HOST']:RDS.dbInstance.instanceEndpoint.hostname
-            }
+                ['GF_AUTH_ANONYMOUS_ENABLED']: 'false',
+                ['GF_DATABASE_TYPE']: 'postgres',
+                ['GF_DATABASE_HOST']: RDS.dbInstance.instanceEndpoint.socketAddress,
+                ['GF_DATABASE_NAME']: 'grafana',
+                ['GF_DATABASE_USER']: 'dbuser',
+                ['GF_DATABASE_PASSWORD']: 'T3st4nd423'
+            },
+
         });
         return ecsTaskDefinition
     }
 
     public static createCapacityProvider(resourcesStack: ResourcesStack, autoScalingGroup: IAutoScalingGroup): AsgCapacityProvider {
         const capacityProvider = new AsgCapacityProvider(resourcesStack, 'AsgCapacityProvider', {
-            capacityProviderName:  `${StackEnviroments.RESOURCES_PREFIX}ecsCapacityProvider`,
+            capacityProviderName: `${StackEnviroments.RESOURCES_PREFIX}ecsCapacityProvider`,
             autoScalingGroup: autoScalingGroup,
             enableManagedTerminationProtection: false,
             enableManagedScaling: true,
@@ -53,13 +58,13 @@ export class ECS {
     }
 
     public static createECSServices(resourcesStack: ResourcesStack, ecsCluster: ICluster): Ec2Service[] {
-        const moodleService = new Ec2Service(resourcesStack, `${StackEnviroments.RESOURCES_PREFIX}moodleService`, {
+        const grafanaService = new Ec2Service(resourcesStack, `${StackEnviroments.RESOURCES_PREFIX}grafanaService`, {
             cluster: ecsCluster,
-            taskDefinition: this.createEcsTaskDefinition(resourcesStack, 'moodle', EcsEnvironments.ECS_MOODLE_PORT),
+            taskDefinition: this.createEcsTaskDefinition(resourcesStack, 'grafana', EcsEnvironments.ECS_GF_PORT),
             desiredCount: 1
         });
-        this.configureECSAutoScaling('moodle', moodleService);
-        return [moodleService];
+        this.configureECSAutoScaling('grafana', grafanaService);
+        return [grafanaService];
     }
 
     private static configureECSAutoScaling(id: string, ecsService: Ec2Service) {

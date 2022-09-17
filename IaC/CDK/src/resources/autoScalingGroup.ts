@@ -1,8 +1,8 @@
-import { CfnParameter, Fn, Stack } from "@aws-cdk/core";
-import { AutoScalingGroup } from "@aws-cdk/aws-autoscaling";
-import { SecurityGroup, InstanceType, Subnet } from "@aws-cdk/aws-ec2";
-import { EcsOptimizedImage } from "@aws-cdk/aws-ecs";
-import { ManagedPolicy, Role, ServicePrincipal } from "@aws-cdk/aws-iam";
+import { CfnParameter, Fn, Stack } from "aws-cdk-lib";
+import { AutoScalingGroup } from "aws-cdk-lib/aws-autoscaling";
+import { SecurityGroup, InstanceType, Subnet } from "aws-cdk-lib/aws-ec2";
+import { EcsOptimizedImage } from "aws-cdk-lib/aws-ecs";
+import { ManagedPolicy, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { ResourcesStack } from "../stacks/resources-stack";
 import { NetworkStack } from "../stacks/network-stack";
 import { StackEnviroments } from "../utils/stackEnvironments";
@@ -19,9 +19,13 @@ export class ASG {
             machineImage: EcsOptimizedImage.amazonLinux2(),
             vpcSubnets: resourcesStack.vpc.selectSubnets({
                 subnets: [
-                    Subnet.fromSubnetAttributes(resourcesStack, `${StackEnviroments.RESOURCES_PREFIX}asgSubnet`, {
-                        subnetId: Fn.importValue('PrivateSubnet'),
+                    Subnet.fromSubnetAttributes(resourcesStack, `${StackEnviroments.RESOURCES_PREFIX}asgSubnet1`, {
+                        subnetId: Fn.importValue('PublicSubnet1'),
                         availabilityZone: Stack.of(resourcesStack).availabilityZones[0]
+                    }),
+                    Subnet.fromSubnetAttributes(resourcesStack, `${StackEnviroments.RESOURCES_PREFIX}asgSubnet2`, {
+                        subnetId: Fn.importValue('PublicSubnet2'),
+                        availabilityZone: Stack.of(resourcesStack).availabilityZones[1]
                     })
                 ]
             }),
@@ -29,8 +33,9 @@ export class ASG {
             desiredCapacity: 1,
             minCapacity: AutoScalingGroupEnviroments.ASG_MIN_CAPACITY,
             maxCapacity: AutoScalingGroupEnviroments.ASG_MAX_CAPACITY,
-            role: IAM.createInstanceRole('asgRole', resourcesStack),
-            securityGroup: IAM.createInstanceSecurityGroup(resourcesStack),
+            role: IAM.instanceRole,
+            securityGroup: IAM.createInstanceSecurityGroup(resourcesStack)
+            // associatePublicIpAddress: false
         });
 
         return autoScalingGroup;
