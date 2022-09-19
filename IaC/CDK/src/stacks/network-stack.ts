@@ -1,10 +1,12 @@
 import * as cdk from "aws-cdk-lib";
-import { InterfaceVpcEndpoint, InterfaceVpcEndpointAwsService, IVpc, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
+import { InterfaceVpcEndpoint, InterfaceVpcEndpointAwsService, ISecurityGroup, IVpc, Peer, Port, SecurityGroup, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
 import { CfnElement, CfnOutput, Fn } from "aws-cdk-lib";
 import { Subnets } from "../resources/subnets";
+import { StackEnviroments } from "../utils/stackEnvironments";
 
 export class NetworkStack extends cdk.Stack {
   readonly vpc: IVpc;
+  private endpointSG: ISecurityGroup;
 
   constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
     try {
@@ -16,6 +18,7 @@ export class NetworkStack extends cdk.Stack {
       this.createACLs();
       this.createSubnetGroups();
       this.createSecurityGroups();
+      // this.createVpcEndpoints();
       this.createNetworkOutputs();
     } catch (error) {
       console.error(error);
@@ -34,7 +37,7 @@ export class NetworkStack extends cdk.Stack {
   private createVPC(): IVpc {
     const vpc = new Vpc(this, 'VPC', {
       vpcName: 'VPC',
-      maxAzs: 2,
+      maxAzs: 1,
       cidr: '10.0.0.0/16',
       subnetConfiguration: [{
         cidrMask: 24,
@@ -43,27 +46,26 @@ export class NetworkStack extends cdk.Stack {
       },
       {
         cidrMask: 24,
-        name: 'DatabaseIsolated',
-        subnetType: SubnetType.PRIVATE_ISOLATED
-      },
-      {
-        cidrMask: 24,
-        name: 'Ec2Isolated',
-        subnetType: SubnetType.PRIVATE_ISOLATED
+        name: 'Ec2Private',
+        subnetType: SubnetType.PRIVATE_WITH_EGRESS
       }],
-
+      
     });
-
-
     return vpc;
   }
 
   private createSecurityGroups(): void {
+    this.endpointSG = new SecurityGroup(this, 'endPointSecurityGroup', {
+      securityGroupName: 'endpointSG',
+      allowAllOutbound: true,
+      vpc: this.vpc
+    });
 
+    this.endpointSG.addIngressRule(Peer.ipv4(this.vpc.vpcCidrBlock), Port.tcp(443));
   }
 
   private createSubnets(): void {
-    // Subnets.createIsolatedSubnet(this);
+    Subnets.createIsolatedSubnet(this);
   }
 
   private createACLs(): void {
@@ -71,29 +73,103 @@ export class NetworkStack extends cdk.Stack {
   }
 
   // private createVpcEndpoints(): void {
-  //   new InterfaceVpcEndpoint(this, 'SFV-ECR-DOCKER-Interface-Endpoint', {
-  //     service: InterfaceVpcEndpointAwsService.ECR_DOCKER,
-  //     vpc: this.vpc,
-  //     subnets: {
-  //       subnets: this.vpc.privateSubnets
-  //     },
-  //   });
 
-  //   new InterfaceVpcEndpoint(this, 'SFV-ECR-Interface-Endpoint', {
+  //   // ECR Required Endpoints
+
+  //   new InterfaceVpcEndpoint(this, `${StackEnviroments.RESOURCES_PREFIX}-ECR-Interface-Endpoint`, {
   //     service: InterfaceVpcEndpointAwsService.ECR,
   //     vpc: this.vpc,
   //     subnets: {
-  //       subnets: this.vpc.privateSubnets,
-  //     }
+  //       subnets: [this.vpc.isolatedSubnets[2]]
+  //     },
+  //     securityGroups: [this.endpointSG]
   //   });
 
-  //   new InterfaceVpcEndpoint(this, 'SFV-CLOUDWATCH-LOGS-Interface-Endpoint', {
+  //   new InterfaceVpcEndpoint(this, `${StackEnviroments.RESOURCES_PREFIX}-ECR-DOCKER-Interface-Endpoint`, {
+  //     service: InterfaceVpcEndpointAwsService.ECR_DOCKER,
+  //     vpc: this.vpc,
+  //     subnets: {
+  //       subnets: [this.vpc.isolatedSubnets[2]]
+  //     },
+  //     securityGroups: [this.endpointSG]
+  //   });
+
+  //   new InterfaceVpcEndpoint(this, `${StackEnviroments.RESOURCES_PREFIX}-S3-Interface-Endpoint`, {
+  //     service: InterfaceVpcEndpointAwsService.S3,
+  //     vpc: this.vpc,
+  //     subnets: {
+  //       subnets: [this.vpc.isolatedSubnets[2]],
+  //     },
+  //     privateDnsEnabled: false,
+  //     securityGroups: [this.endpointSG]
+  //   });
+
+  //   // ECS Required Endpoints
+  //   new InterfaceVpcEndpoint(this, `${StackEnviroments.RESOURCES_PREFIX}-ECS-Interface-Endpoint`, {
+  //     service: InterfaceVpcEndpointAwsService.ECS,
+  //     vpc: this.vpc,
+  //     subnets: {
+  //       subnets: [this.vpc.isolatedSubnets[2]],
+  //     },
+  //     securityGroups: [this.endpointSG]
+  //   });
+
+  //   new InterfaceVpcEndpoint(this, `${StackEnviroments.RESOURCES_PREFIX}-ECS_TELEMETRY-Interface-Endpoint`, {
+  //     service: InterfaceVpcEndpointAwsService.ECS_TELEMETRY,
+  //     vpc: this.vpc,
+  //     subnets: {
+  //       subnets: [this.vpc.isolatedSubnets[2]],
+  //     },
+  //     securityGroups: [this.endpointSG]
+  //   });
+
+  //   new InterfaceVpcEndpoint(this, `${StackEnviroments.RESOURCES_PREFIX}-ECS_AGENT-Interface-Endpoint`, {
+  //     service: InterfaceVpcEndpointAwsService.ECS_AGENT,
+  //     vpc: this.vpc,
+  //     subnets: {
+  //       subnets: [this.vpc.isolatedSubnets[2]],
+  //     },
+  //     securityGroups: [this.endpointSG]
+  //   });
+
+  //   // Logs Endpoint
+  //   new InterfaceVpcEndpoint(this, `${StackEnviroments.RESOURCES_PREFIX}-CLOUDWATCH-LOGS-Interface-Endpoint`, {
   //     service: InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
   //     vpc: this.vpc,
   //     subnets: {
-  //       subnets: this.vpc.privateSubnets,
+  //       subnets: [this.vpc.isolatedSubnets[2]],
+  //     },
+  //     securityGroups: [this.endpointSG]
+
+  //   });
+
+  //   // SSM Required Endpoints
+  //   new InterfaceVpcEndpoint(this, `${StackEnviroments.RESOURCES_PREFIX}-SSM-Interface-Endpoint`, {
+  //     service: InterfaceVpcEndpointAwsService.SSM,
+  //     vpc: this.vpc,
+  //     subnets: {
+  //       subnets: [this.vpc.isolatedSubnets[2]],
   //     }
   //   });
+
+  //   new InterfaceVpcEndpoint(this, `${StackEnviroments.RESOURCES_PREFIX}-SSM-MESSAGES-Interface-Endpoint`, {
+  //     service: InterfaceVpcEndpointAwsService.SSM_MESSAGES,
+  //     vpc: this.vpc,
+  //     subnets: {
+  //       subnets: [this.vpc.isolatedSubnets[2]],
+  //     },
+  //     securityGroups: [this.endpointSG]
+  //   });
+
+  //   new InterfaceVpcEndpoint(this, `${StackEnviroments.RESOURCES_PREFIX}-EC2-MESSAGES-Endpoint`, {
+  //     service: InterfaceVpcEndpointAwsService.EC2_MESSAGES,
+  //     vpc: this.vpc,
+  //     subnets: {
+  //       subnets: [this.vpc.isolatedSubnets[2]],
+  //     },
+  //     securityGroups: [this.endpointSG]
+  //   });
+
   // }
 
   private createSubnetGroups(): void {
@@ -115,30 +191,19 @@ export class NetworkStack extends cdk.Stack {
       value: this.vpc.publicSubnets[0].subnetId
     });
 
-    new CfnOutput(this, 'PublicSubnet2Output', {
-      exportName: 'PublicSubnet2',
-      value: this.vpc.publicSubnets[1].subnetId
-    });
-
     new CfnOutput(this, `DatabaseSubnet1Output`, {
       exportName: 'DatabaseSubnet1',
-      value: this.vpc.isolatedSubnets[0].subnetId
+      value: Subnets.databaseSubnet1.subnetId
     });
 
     new CfnOutput(this, `DatabaseSubnet2Output`, {
       exportName: 'DatabaseSubnet2',
-      value: this.vpc.isolatedSubnets[1].subnetId
+      value: Subnets.databaseSubnet2.subnetId
     });
 
-    new CfnOutput(this, `Ec2Subnet1Output`, {
-      exportName: 'Ec2Subnet1',
-      value: this.vpc.isolatedSubnets[2].subnetId
+    new CfnOutput(this, `Ec2PrivateSubnetOutput`, {
+      exportName: 'Ec2PrivateSubnet',
+      value: this.vpc.privateSubnets[0].subnetId
     });
-
-    new CfnOutput(this, 'Ec2Subnet2Output', {
-      exportName: `Ec2Subnet2`,
-      value: this.vpc.isolatedSubnets[3].subnetId
-    });
-    // Subnets.createOutputs(this);
   }
 }

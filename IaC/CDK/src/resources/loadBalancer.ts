@@ -1,34 +1,33 @@
 import { CfnOutput, Duration, Fn} from "aws-cdk-lib";
-import { Subnet} from "aws-cdk-lib/aws-ec2";
+import { INetworkAcl, Subnet} from "aws-cdk-lib/aws-ec2";
 import { Ec2Service } from "aws-cdk-lib/aws-ecs";
-import { NetworkLoadBalancer } from "aws-cdk-lib/aws-elasticloadbalancingv2";
+import { INetworkLoadBalancer, NetworkLoadBalancer } from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import { ResourcesStack } from "../stacks/resources-stack";
 import { StackEnviroments } from "../utils/stackEnvironments";
 import { EcsEnvironments } from "../utils/ecsEnvironments";
 
 export class NLB {
+    public static networkLoadBalancer: INetworkLoadBalancer;
+    public static createLoadBalancer(resourcesStack: ResourcesStack, grafanaService: Ec2Service): void {
 
-    public static createLoadBalancer(resourcesStack: ResourcesStack, moodleService: Ec2Service): void {
-
-        const nlb = new NetworkLoadBalancer(resourcesStack, "NetworkLoadBalancer", {
+        this.networkLoadBalancer = new NetworkLoadBalancer(resourcesStack, "NetworkLoadBalancer", {
             loadBalancerName: `${StackEnviroments.RESOURCES_PREFIX}NetworkLoadBalancer`,
             vpc: resourcesStack.vpc,
             internetFacing: true,
             vpcSubnets: {
                 subnets: [
-                    Subnet.fromSubnetId(resourcesStack, 'nlbSubnetId2', Fn.importValue('PublicSubnet'))
+                    Subnet.fromSubnetId(resourcesStack, 'nlbSubnetId1', Fn.importValue('PublicSubnet1'))
                 ]
             }
         });
 
-        
-        const moodleListener = nlb.addListener('authListener', {
+        const grafanaListener = this.networkLoadBalancer.addListener('grafanaListener', {
             port: 80
         });
 
-        moodleListener.addTargets('auth-target', {
+        grafanaListener.addTargets('grafana-target', {
             port: EcsEnvironments.ECS_GF_PORT,
-            targets: [moodleService],
+            targets: [grafanaService],
             healthCheck: {
                 unhealthyThresholdCount: 3,
                 healthyThresholdCount: 3,
@@ -38,7 +37,7 @@ export class NLB {
 
         new CfnOutput(resourcesStack, 'nlbDNS', {
             exportName: 'nlbDNS',
-            value: nlb.loadBalancerDnsName,
+            value: this.networkLoadBalancer.loadBalancerDnsName,
         });
     }
 }

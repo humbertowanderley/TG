@@ -9,20 +9,22 @@ import { StackEnviroments } from "../utils/stackEnvironments";
 import { AutoScalingGroupEnviroments } from "../utils/autoScalingGroupEnvironments";
 
 export class Subnets {
-    private static isolatedSubnet: ISubnet;
+    public static databaseSubnet1: ISubnet;
+    public static databaseSubnet2: ISubnet;
 
-    // public static createIsolatedSubnet(networkStack: NetworkStack) {
-    //     this.isolatedSubnet = new PrivateSubnet(networkStack, 'DatabaseIsolatedSubnet2', {
-    //         vpcId: networkStack.vpc.vpcId,
-    //         availabilityZone: 'us-east-1b',
-    //         cidrBlock: '10.0.8.0/24'
-    //     });
-    // }
+    public static createIsolatedSubnet(networkStack: NetworkStack) {
+        this.databaseSubnet1 = new PrivateSubnet(networkStack, 'DataBaseSubnet1', {
+            vpcId: networkStack.vpc.vpcId,
+            availabilityZone: 'us-east-1a',
+            cidrBlock: '10.0.10.0/24'
+        });
 
-    // public static createOutputs(networkStack: NetworkStack) {
-    //     new CfnOutput(networkStack, 'isolatedSubnet2IdOutput', {
-    //         exportName: 'IsolatedSubnet2',
-    //         value: this.isolatedSubnet.subnetId
-    //     });
-    // }
+        this.databaseSubnet2 = new PrivateSubnet(networkStack, 'DataBaseSubnet2', {
+            vpcId: networkStack.vpc.vpcId,
+            availabilityZone: 'us-east-1b',
+            cidrBlock: '10.0.11.0/24'
+        });
+
+    }
+
 }

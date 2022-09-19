@@ -21,7 +21,9 @@ export class IAM {
             managedPolicies: [
                 ManagedPolicy.fromManagedPolicyArn(resourcesStack, `instanceAmazonECSTaskExecutionRolePolicy`, 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'),
                 ManagedPolicy.fromManagedPolicyArn(resourcesStack, `instanceAmazonEC2ContainerServiceforEC2Role`, 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role'),
-                ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
+                ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
+                ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2ContainerRegistryReadOnly'),
+                ManagedPolicy.fromAwsManagedPolicyName('AmazonS3FullAccess')  
             ]
         });
     }
