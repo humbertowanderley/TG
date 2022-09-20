@@ -47,7 +47,7 @@ export class RDS {
                 version: PostgresEngineVersion.VER_11
             }),
             instanceType: InstanceType.of(InstanceClass.T2, InstanceSize.MICRO),
-            credentials: Credentials.fromPassword('dbuser', SecretValue.plainText('T3st4nd423')),
+            credentials: Credentials.fromPassword('grafana', SecretValue.plainText('T3st4nd423')),
             multiAz: false,
             allocatedStorage: 100,
             allowMajorVersionUpgrade: false,

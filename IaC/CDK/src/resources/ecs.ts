@@ -14,7 +14,9 @@ import { Fn } from "aws-cdk-lib";
 export class ECS {
 
     public static taskDefinition: Ec2TaskDefinition;
+    public static taskDefinition2: Ec2TaskDefinition;
     public static grafanaService: Ec2Service;
+    public static grafanaDataGeneratorService: Ec2Service;
     public static capacityProvider: AsgCapacityProvider;
     public static ecsCluster: Cluster;
 
@@ -41,8 +43,23 @@ export class ECS {
                 ['GF_DATABASE_TYPE']: 'postgres',
                 ['GF_DATABASE_HOST']: Fn.importValue('DatabaseEndpoint'),
                 ['GF_DATABASE_NAME']: 'grafana',
-                ['GF_DATABASE_USER']: 'dbuser',
+                ['GF_DATABASE_USER']: 'grafana',
                 ['GF_DATABASE_PASSWORD']: 'T3st4nd423'
+            },
+
+        });
+
+        this.taskDefinition2 = new Ec2TaskDefinition(resourcesStack, `${containerName}DataGeneratorTaskDefinition`, {
+            taskRole: IAM.instanceRole
+        });
+        this.taskDefinition2.addContainer(`${containerName}DataGenerator`, {
+            containerName: `${containerName}DataGenerator`,
+            image: ContainerImage.fromEcrRepository(Repository.fromRepositoryName(resourcesStack, 'fakedataRepository', 'fake-data-gen'),'latest'),
+            memoryLimitMiB: EcsEnvironments.ECS_TASK_CONTAINERS_MEMORY_LIMIT,
+            environment: {
+                ['FD_DATASOURCE']: 'postgres',
+                ['FD_SERVER']: RDS.dbInstance.dbInstanceEndpointAddress,
+                ['FD_PORT']: '5432'
             },
 
         });
@@ -67,6 +84,14 @@ export class ECS {
             taskDefinition: this.taskDefinition,
             desiredCount: 1
         });
+
+        this.grafanaDataGeneratorService = new Ec2Service(resourcesStack, `${StackEnviroments.RESOURCES_PREFIX}dataGeneratorService`, {
+            cluster: ecsCluster,
+            taskDefinition: this.taskDefinition2,
+            desiredCount: 1
+        });
+
+
         this.configureECSAutoScaling('grafana', this.grafanaService);
     }
 
